@@ -80,33 +80,34 @@ triggers.forEach((trigger) => {
 
 // 2. Scroll Animation (Intersection Observer)
 const observerOptions = {
-  threshold: 0.1,
-  // 【修正】PCでの表示漏れを防ぐため、マイナス値をなくし画面に入った瞬間に検知させる
-  rootMargin: "0px", 
+  // 【修正】少しでも画面に入ったら検知するように変更（PCでの表示漏れ防止）
+  threshold: 0,
+  rootMargin: "0px",
 };
 
 const observer = new IntersectionObserver((entries) => {
   entries.forEach((entry) => {
     if (entry.isIntersecting) {
-      // 重複実行を防ぐため、検知したらすぐに監視を外す
+      // 監視を解除（一度だけ実行）
       observer.unobserve(entry.target);
       
-      // 【修正】到達してから0.8秒後に表示クラスを付与
+      // 【修正】0.5秒後 (500ms) に表示クラスを付与
       setTimeout(() => {
         entry.target.classList.add("visible");
-      }, 800);
+      }, 500);
     }
   });
 }, observerOptions);
 
-// 画像やテキストが読み込まれたら監視対象に追加
-// PCでの読み込みタイミング対策として window.onload も追加
+// 監視を開始する関数
 function initObserver() {
-  document.querySelectorAll(".reveal-text, .reveal-image").forEach((el) => {
+  const elements = document.querySelectorAll(".reveal-text, .reveal-image");
+  elements.forEach((el) => {
     observer.observe(el);
   });
 }
 
+// 読み込み完了時と、全てのリソース読み込み後の両方で監視を確認
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initObserver);
 } else {
