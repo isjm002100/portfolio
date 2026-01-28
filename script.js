@@ -45,7 +45,7 @@ if (copyBtn) {
   });
 }
 
-// 1. Custom Cursor Logic (Existing)
+// 1. Custom Cursor Logic
 const cursor = document.getElementById("cursor");
 const cursorDot = document.getElementById("cursor-dot");
 
@@ -201,3 +201,204 @@ if (canvas) {
   initParticles();
   animateCanvas();
 }
+
+// --- Mini Game Logic ---
+(function() {
+  const startBtn = document.getElementById('start-game-btn');
+  const gameUI = document.getElementById('game-ui');
+  const gameArea = document.getElementById('game-area');
+  const gameChar = document.getElementById('game-char');
+  const scoreDisplay = document.getElementById('score-display');
+  const feedbackContainer = document.getElementById('feedback-container');
+
+  if (!gameArea) return;
+
+  let isPlaying = false;
+  let score = 0;
+  let lastTime = 0;
+  let spawnTimer = 0;
+  let nextSpawnInterval = 0; // 次のスポーンまでの時間を格納
+  let circles = [];
+  let speed = 4;
+  let animationId;
+
+  // Configuration
+  const CHAR_X_POS = 40; // Approximate left position of character center (px)
+  const HIT_ZONE = 40;   // Tolerance +/- px
+
+  // Start Game
+  startBtn.addEventListener('click', () => {
+    startGame();
+  });
+
+  // Controls (Mouse/Touch & Keyboard)
+  gameArea.parentElement.addEventListener('mousedown', handleInput);
+  gameArea.parentElement.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // Prevent scroll
+    handleInput();
+  }, { passive: false });
+  
+  document.addEventListener('keydown', (e) => {
+    if (isPlaying && e.code === 'Space') {
+      e.preventDefault(); // Prevent scroll
+      handleInput();
+    }
+  });
+
+  function setRandomInterval() {
+    // 0.5秒(500ms) 〜 2.5秒(2500ms) の間でランダムに決定
+    nextSpawnInterval = Math.random() * 2000 + 500;
+  }
+
+  function startGame() {
+    isPlaying = true;
+    score = 0;
+    circles = [];
+    speed = window.innerWidth < 768 ? 3 : 5;
+    scoreDisplay.innerText = "0";
+    gameUI.classList.add('opacity-0', 'pointer-events-none');
+    
+    // Clear existing elements
+    document.querySelectorAll('.game-circle').forEach(el => el.remove());
+    
+    // Character reset
+    gameChar.innerText = "(^.^)";
+    
+    // 初回のスポーン時間をセット
+    setRandomInterval();
+    spawnTimer = 0;
+    
+    lastTime = performance.now();
+    requestAnimationFrame(gameLoop);
+  }
+
+  function handleInput() {
+    if (!isPlaying) return;
+
+    // Character Jump/Bop Animation
+    gameChar.style.transform = "translateY(-10px)";
+    setTimeout(() => {
+      gameChar.style.transform = "translateY(0)";
+    }, 100);
+
+    // Check collision
+    // Find the closest circle to the character
+    const circleElements = document.querySelectorAll('.game-circle');
+    let closestDist = Infinity;
+    let targetCircle = null;
+
+    circleElements.forEach(el => {
+      const rect = el.getBoundingClientRect();
+      const areaRect = gameArea.getBoundingClientRect();
+      
+      // Calculate position relative to game area
+      const relativeX = rect.left - areaRect.left;
+      
+      // Distance to character center (approx 50px from left)
+      const dist = relativeX - CHAR_X_POS;
+      
+      // We only care about circles that are close, even if slightly passed
+      if (Math.abs(dist) < closestDist) {
+        closestDist = dist;
+        targetCircle = el;
+      }
+    });
+
+    if (targetCircle && Math.abs(closestDist) < HIT_ZONE) {
+      evaluateHit(closestDist, targetCircle);
+    }
+  }
+
+  function evaluateHit(dist, element) {
+    const absDist = Math.abs(dist);
+    let feedback = "";
+    let type = "";
+
+    if (absDist < 15) {
+      feedback = "Nice!!";
+      type = "nice";
+      score += 100;
+      gameChar.classList.add('char-hit');
+      setTimeout(() => gameChar.classList.remove('char-hit'), 200);
+    } else if (absDist < 30) {
+      feedback = "Good";
+      type = "good";
+      score += 50;
+    } else {
+      feedback = "Bad";
+      type = "bad";
+      score += 10;
+    }
+
+    // Update Score
+    scoreDisplay.innerText = score;
+    
+    // Show Visual Feedback
+    showFeedbackText(feedback, type);
+
+    // Remove the circle
+    element.remove();
+    // Remove from array logic
+    circles = circles.filter(c => c.element !== element);
+  }
+
+  function showFeedbackText(text, type) {
+    const el = document.createElement('div');
+    el.classList.add('game-feedback', `feedback-${type}`);
+    el.innerText = text;
+    feedbackContainer.appendChild(el);
+    
+    // Auto remove after animation
+    setTimeout(() => {
+      el.remove();
+    }, 800);
+  }
+
+  function spawnCircle() {
+    const el = document.createElement('div');
+    el.classList.add('game-circle');
+    el.innerText = "○";
+    el.style.left = "100%"; // Start from right
+    gameArea.appendChild(el);
+
+    circles.push({
+      element: el,
+      x: gameArea.offsetWidth
+    });
+  }
+
+  function gameLoop(timestamp) {
+    if (!isPlaying) return;
+
+    const deltaTime = timestamp - lastTime;
+    lastTime = timestamp;
+
+    // Move Circles
+    circles.forEach((circle, index) => {
+      circle.x -= speed * (deltaTime / 16); // normalize speed
+      circle.element.style.left = `${circle.x}px`;
+
+      // Remove if off screen
+      if (circle.x < -50) {
+        circle.element.remove();
+        circles.splice(index, 1);
+        
+        // Missed text
+        showFeedbackText("Bad", "bad");
+      }
+    });
+
+    // Spawn Logic (Updated Random Interval)
+    spawnTimer += deltaTime;
+    if (spawnTimer > nextSpawnInterval) {
+      spawnCircle();
+      spawnTimer = 0;
+      setRandomInterval(); // 次のスポーンまでの時間をランダム再設定
+
+      // Increase speed slightly over time
+      if(speed < 12) speed += 0.05;
+    }
+
+    animationId = requestAnimationFrame(gameLoop);
+  }
+})();
