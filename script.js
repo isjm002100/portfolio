@@ -10,23 +10,18 @@ const mobileLinks = document.querySelectorAll(".mobile-link");
 
 if (menuToggle && mobileMenu) {
   menuToggle.addEventListener("click", () => {
-    // Toggle Menu Visibility
     const isClosed = mobileMenu.classList.contains("opacity-0");
-
     if (isClosed) {
-      // Open
       mobileMenu.classList.remove("opacity-0", "pointer-events-none");
       iconMenu.classList.add("opacity-0");
       iconClose.classList.remove("opacity-0");
     } else {
-      // Close
       mobileMenu.classList.add("opacity-0", "pointer-events-none");
       iconMenu.classList.remove("opacity-0");
       iconClose.classList.add("opacity-0");
     }
   });
 
-  // Close menu when a link is clicked
   mobileLinks.forEach((link) => {
     link.addEventListener("click", () => {
       mobileMenu.classList.add("opacity-0", "pointer-events-none");
@@ -45,35 +40,27 @@ if (copyBtn) {
   });
 }
 
-// 1. Custom Cursor Logic
+// 1. Custom Cursor Logic (PC Only via CSS media query check)
 const cursor = document.getElementById("cursor");
 const cursorDot = document.getElementById("cursor-dot");
-
-let mouseX = 0,
-  mouseY = 0;
-let cursorX = 0,
-  cursorY = 0;
+let mouseX = 0, mouseY = 0;
+let cursorX = 0, cursorY = 0;
 
 document.addEventListener("mousemove", (e) => {
   mouseX = e.clientX;
   mouseY = e.clientY;
-
-  // Immediate update for dot
   if (cursorDot) {
     cursorDot.style.left = mouseX + "px";
     cursorDot.style.top = mouseY + "px";
   }
 });
 
-// Smooth follow for outer circle
 function animateCursor() {
   if (cursor) {
     const dx = mouseX - cursorX;
     const dy = mouseY - cursorY;
-
     cursorX += dx * 0.15;
     cursorY += dy * 0.15;
-
     cursor.style.left = cursorX + "px";
     cursor.style.top = cursorY + "px";
   }
@@ -81,7 +68,6 @@ function animateCursor() {
 }
 animateCursor();
 
-// Hover effects
 const triggers = document.querySelectorAll(".hover-trigger");
 triggers.forEach((trigger) => {
   trigger.addEventListener("mouseenter", () => {
@@ -95,27 +81,31 @@ triggers.forEach((trigger) => {
 // 2. Scroll Animation (Intersection Observer)
 const observerOptions = {
   threshold: 0.1,
-  rootMargin: "0px 0px -50px 0px",
+  // rootMarginを少し広げて、早めに検知させる（画像表示漏れ防止）
+  rootMargin: "0px 0px -20px 0px",
 };
 
 const observer = new IntersectionObserver((entries) => {
   entries.forEach((entry) => {
     if (entry.isIntersecting) {
       entry.target.classList.add("visible");
-      observer.unobserve(entry.target); // Trigger once
+      observer.unobserve(entry.target);
     }
   });
 }, observerOptions);
 
-document.querySelectorAll(".reveal-text, .reveal-image").forEach((el) => {
-  observer.observe(el);
+// 画像やテキストが読み込まれたら監視対象に追加
+window.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll(".reveal-text, .reveal-image").forEach((el) => {
+    observer.observe(el);
+  });
 });
 
-// 3. Background Canvas Animation (Abstract Tech/Flow)
+
+// 3. Background Canvas Animation
 const canvas = document.getElementById("bg-canvas");
 if (canvas) {
   const ctx = canvas.getContext("2d");
-
   let width, height;
   let particles = [];
 
@@ -133,14 +123,13 @@ if (canvas) {
       this.size = Math.random() * 2;
       this.color = Math.random() > 0.9 ? "#3b82f6" : "#333";
     }
-
     update() {
       this.x += this.vx;
       this.y += this.vy;
-
       if (this.x < 0 || this.x > width) this.vx *= -1;
       if (this.y < 0 || this.y > height) this.vy *= -1;
-
+      
+      // Mouse repulsion
       const dx = mouseX - this.x;
       const dy = mouseY - this.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -149,7 +138,6 @@ if (canvas) {
         this.y -= dy * 0.01;
       }
     }
-
     draw() {
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
@@ -168,16 +156,13 @@ if (canvas) {
 
   function animateCanvas() {
     ctx.clearRect(0, 0, width, height);
-
     particles.forEach((p, i) => {
       p.update();
       p.draw();
-
       for (let j = i; j < particles.length; j++) {
         const dx = particles[i].x - particles[j].x;
         const dy = particles[i].y - particles[j].y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-
         if (dist < 100) {
           ctx.beginPath();
           ctx.strokeStyle = `rgba(50, 50, 50, ${1 - dist / 100})`;
@@ -188,7 +173,6 @@ if (canvas) {
         }
       }
     });
-
     requestAnimationFrame(animateCanvas);
   }
 
@@ -196,7 +180,6 @@ if (canvas) {
     resize();
     initParticles();
   });
-
   resize();
   initParticles();
   animateCanvas();
@@ -217,36 +200,44 @@ if (canvas) {
   let score = 0;
   let lastTime = 0;
   let spawnTimer = 0;
-  let nextSpawnInterval = 0; // 次のスポーンまでの時間を格納
+  let nextSpawnInterval = 0;
   let circles = [];
   let speed = 4;
   let animationId;
+  const CHAR_X_POS = 40;
+  const HIT_ZONE = 40;
 
-  // Configuration
-  const CHAR_X_POS = 40; // Approximate left position of character center (px)
-  const HIT_ZONE = 40;   // Tolerance +/- px
-
-  // Start Game
-  startBtn.addEventListener('click', () => {
+  startBtn.addEventListener('click', (e) => {
+    // ボタンクリックイベントが伝播して親のtouchstartでキャンセルされないようにする
+    e.stopPropagation();
     startGame();
   });
 
-  // Controls (Mouse/Touch & Keyboard)
+  // Controls
   gameArea.parentElement.addEventListener('mousedown', handleInput);
+  
+  // ★修正箇所: スマホでのタッチイベント処理
   gameArea.parentElement.addEventListener('touchstart', (e) => {
-    e.preventDefault(); // Prevent scroll
-    handleInput();
+    // もしタッチされたのがボタン(またはその中身)なら、preventDefaultしない
+    if (e.target.closest('button') || e.target.id === 'start-game-btn') {
+      return; 
+    }
+    
+    // それ以外（ゲームエリア）ならスクロールを防いでゲーム操作を受け付ける
+    if (isPlaying) {
+        e.preventDefault();
+        handleInput();
+    }
   }, { passive: false });
   
   document.addEventListener('keydown', (e) => {
     if (isPlaying && e.code === 'Space') {
-      e.preventDefault(); // Prevent scroll
+      e.preventDefault();
       handleInput();
     }
   });
 
   function setRandomInterval() {
-    // 0.5秒(500ms) 〜 2.5秒(2500ms) の間でランダムに決定
     nextSpawnInterval = Math.random() * 2000 + 500;
   }
 
@@ -257,17 +248,10 @@ if (canvas) {
     speed = window.innerWidth < 768 ? 3 : 5;
     scoreDisplay.innerText = "0";
     gameUI.classList.add('opacity-0', 'pointer-events-none');
-    
-    // Clear existing elements
     document.querySelectorAll('.game-circle').forEach(el => el.remove());
-    
-    // Character reset
     gameChar.innerText = "(^.^)";
-    
-    // 初回のスポーン時間をセット
     setRandomInterval();
     spawnTimer = 0;
-    
     lastTime = performance.now();
     requestAnimationFrame(gameLoop);
   }
@@ -275,14 +259,11 @@ if (canvas) {
   function handleInput() {
     if (!isPlaying) return;
 
-    // Character Jump/Bop Animation
     gameChar.style.transform = "translateY(-10px)";
     setTimeout(() => {
       gameChar.style.transform = "translateY(0)";
     }, 100);
 
-    // Check collision
-    // Find the closest circle to the character
     const circleElements = document.querySelectorAll('.game-circle');
     let closestDist = Infinity;
     let targetCircle = null;
@@ -290,14 +271,8 @@ if (canvas) {
     circleElements.forEach(el => {
       const rect = el.getBoundingClientRect();
       const areaRect = gameArea.getBoundingClientRect();
-      
-      // Calculate position relative to game area
       const relativeX = rect.left - areaRect.left;
-      
-      // Distance to character center (approx 50px from left)
       const dist = relativeX - CHAR_X_POS;
-      
-      // We only care about circles that are close, even if slightly passed
       if (Math.abs(dist) < closestDist) {
         closestDist = dist;
         targetCircle = el;
@@ -329,16 +304,9 @@ if (canvas) {
       type = "bad";
       score += 10;
     }
-
-    // Update Score
     scoreDisplay.innerText = score;
-    
-    // Show Visual Feedback
     showFeedbackText(feedback, type);
-
-    // Remove the circle
     element.remove();
-    // Remove from array logic
     circles = circles.filter(c => c.element !== element);
   }
 
@@ -347,58 +315,40 @@ if (canvas) {
     el.classList.add('game-feedback', `feedback-${type}`);
     el.innerText = text;
     feedbackContainer.appendChild(el);
-    
-    // Auto remove after animation
-    setTimeout(() => {
-      el.remove();
-    }, 800);
+    setTimeout(() => { el.remove(); }, 800);
   }
 
   function spawnCircle() {
     const el = document.createElement('div');
     el.classList.add('game-circle');
     el.innerText = "○";
-    el.style.left = "100%"; // Start from right
+    el.style.left = "100%";
     gameArea.appendChild(el);
-
-    circles.push({
-      element: el,
-      x: gameArea.offsetWidth
-    });
+    circles.push({ element: el, x: gameArea.offsetWidth });
   }
 
   function gameLoop(timestamp) {
     if (!isPlaying) return;
-
     const deltaTime = timestamp - lastTime;
     lastTime = timestamp;
 
-    // Move Circles
     circles.forEach((circle, index) => {
-      circle.x -= speed * (deltaTime / 16); // normalize speed
+      circle.x -= speed * (deltaTime / 16);
       circle.element.style.left = `${circle.x}px`;
-
-      // Remove if off screen
       if (circle.x < -50) {
         circle.element.remove();
         circles.splice(index, 1);
-        
-        // Missed text
         showFeedbackText("Bad", "bad");
       }
     });
 
-    // Spawn Logic (Updated Random Interval)
     spawnTimer += deltaTime;
     if (spawnTimer > nextSpawnInterval) {
       spawnCircle();
       spawnTimer = 0;
-      setRandomInterval(); // 次のスポーンまでの時間をランダム再設定
-
-      // Increase speed slightly over time
+      setRandomInterval();
       if(speed < 12) speed += 0.05;
     }
-
     animationId = requestAnimationFrame(gameLoop);
   }
 })();
