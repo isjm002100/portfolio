@@ -40,7 +40,7 @@ if (copyBtn) {
   });
 }
 
-// 1. Custom Cursor Logic (PC Only via CSS media query check)
+// 1. Custom Cursor Logic
 const cursor = document.getElementById("cursor");
 const cursorDot = document.getElementById("cursor-dot");
 let mouseX = 0, mouseY = 0;
@@ -81,25 +81,38 @@ triggers.forEach((trigger) => {
 // 2. Scroll Animation (Intersection Observer)
 const observerOptions = {
   threshold: 0.1,
-  // rootMarginを少し広げて、早めに検知させる（画像表示漏れ防止）
-  rootMargin: "0px 0px -20px 0px",
+  // 【修正】PCでの表示漏れを防ぐため、マイナス値をなくし画面に入った瞬間に検知させる
+  rootMargin: "0px", 
 };
 
 const observer = new IntersectionObserver((entries) => {
   entries.forEach((entry) => {
     if (entry.isIntersecting) {
-      entry.target.classList.add("visible");
+      // 重複実行を防ぐため、検知したらすぐに監視を外す
       observer.unobserve(entry.target);
+      
+      // 【修正】到達してから0.8秒後に表示クラスを付与
+      setTimeout(() => {
+        entry.target.classList.add("visible");
+      }, 800);
     }
   });
 }, observerOptions);
 
 // 画像やテキストが読み込まれたら監視対象に追加
-window.addEventListener('DOMContentLoaded', () => {
+// PCでの読み込みタイミング対策として window.onload も追加
+function initObserver() {
   document.querySelectorAll(".reveal-text, .reveal-image").forEach((el) => {
     observer.observe(el);
   });
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initObserver);
+} else {
+  initObserver();
+}
+window.addEventListener('load', initObserver);
 
 
 // 3. Background Canvas Animation
@@ -129,7 +142,6 @@ if (canvas) {
       if (this.x < 0 || this.x > width) this.vx *= -1;
       if (this.y < 0 || this.y > height) this.vy *= -1;
       
-      // Mouse repulsion
       const dx = mouseX - this.x;
       const dy = mouseY - this.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -208,7 +220,6 @@ if (canvas) {
   const HIT_ZONE = 40;
 
   startBtn.addEventListener('click', (e) => {
-    // ボタンクリックイベントが伝播して親のtouchstartでキャンセルされないようにする
     e.stopPropagation();
     startGame();
   });
@@ -216,17 +227,15 @@ if (canvas) {
   // Controls
   gameArea.parentElement.addEventListener('mousedown', handleInput);
   
-  // ★修正箇所: スマホでのタッチイベント処理
+  // Mobile Touch Fix
   gameArea.parentElement.addEventListener('touchstart', (e) => {
-    // もしタッチされたのがボタン(またはその中身)なら、preventDefaultしない
     if (e.target.closest('button') || e.target.id === 'start-game-btn') {
       return; 
     }
     
-    // それ以外（ゲームエリア）ならスクロールを防いでゲーム操作を受け付ける
     if (isPlaying) {
-        e.preventDefault();
-        handleInput();
+      e.preventDefault();
+      handleInput();
     }
   }, { passive: false });
   
